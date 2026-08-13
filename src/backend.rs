@@ -1,7 +1,8 @@
 use axum::{
-    extract::State,
-    http::StatusCode,
-    response::{IntoResponse, Json},
+    extract::{Request, State},
+    http::{header::AUTHORIZATION, StatusCode},
+    middleware::{self, Next},
+    response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
 };
@@ -19,10 +20,13 @@ use crate::common::EncryptedSubmitRequest;
 struct AppState {
     priv_key: RsaPrivateKey,
     pub_key_pem: String,
+    admin_token: String,
 }
 
 pub async fn run() {
     tracing_subscriber::fmt::init();
+
+    let admin_token = std::env::var("ADMIN_TOKEN").expect("ADMIN_TOKEN must be set");
 
     info!("Generating RSA keys... this may take a moment.");
     let mut rng = rand::thread_rng();
@@ -45,11 +49,17 @@ pub async fn run() {
     let state = Arc::new(AppState {
         priv_key,
         pub_key_pem,
+        admin_token,
     });
+
+    let admin_routes = Router::new()
+        .route("/submissions", get(get_submissions))
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
 
     let app = Router::new()
         .route("/pubkey", get(get_pubkey))
         .route("/submit", post(submit_form))
+        .nest("/api/admin", admin_routes)
         .with_state(state)
         .layer(CorsLayer::permissive());
 
@@ -94,4 +104,28 @@ async fn submit_form(
             (StatusCode::BAD_REQUEST, "Failed to decrypt payload")
         }
     }
+}
+
+async fn auth_middleware(
+    State(state): State<Arc<AppState>>,
+    req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let auth_header = req.headers().get(AUTHORIZATION);
+    if let Some(auth_header) = auth_header {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str == format!("Bearer {}", state.admin_token) {
+                return Ok(next.run(req).await);
+            }
+        }
+    }
+    Err(StatusCode::UNAUTHORIZED)
+}
+
+async fn get_submissions() -> impl IntoResponse {
+    let mock_payloads = vec![
+        "mock_encrypted_payload_1",
+        "mock_encrypted_payload_2",
+    ];
+    (StatusCode::OK, Json(mock_payloads))
 }

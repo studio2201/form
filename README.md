@@ -2,6 +2,7 @@
 
 ## Container Variables
 - `BIND_ADDR`: Set the listening address and port (default: `0.0.0.0:4406`)
+- `ADMIN_TOKEN`: Required. Set the token for accessing admin API endpoints.
 - **Volume Mappings:**
   - `/app/config`: Map this directory to inject custom configuration files
   - `/app/data`: Map this directory for persistent data storage
