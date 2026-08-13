@@ -3,7 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <title>Form App</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link data-trunk rel="copy-file" href="manifest.json" />
+    <link data-trunk rel="copy-file" href="service-worker.js" />
     <!-- Trunk will insert the wasm bindings here -->
   </head>
-  <body></body>
+  <body>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+  </body>
 </html>
